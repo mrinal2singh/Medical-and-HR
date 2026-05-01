@@ -693,4 +693,52 @@ if not claim_upload and not hr_upload and not gg_upload:
             
             # Dashboard 2 Default Render
             st.markdown("<h3 style='color: #002b5b;'>📊 Dashboard_2_GG_app_HR_Status (Last Run)</h3>", unsafe_allow_html=True)
-            df2_plot = df_dash
+            df2_plot = df_dash2[df_dash2["GG_app_status"] != "GRAND TOTAL"]
+            if not df2_plot.empty:
+                fig2 = px.pie(df2_plot, names='GG_app_status', values='Count of unique empid', hole=0.4, title='GG App Status Distribution', color_discrete_sequence=px.colors.qualitative.Set2)
+                st.plotly_chart(fig2, use_container_width=True)
+            
+            html_table_2 = generate_html_table(df_dash2.fillna("").to_dict('records'))
+            st.markdown(html_table_2, unsafe_allow_html=True)
+            
+        except Exception as e:
+            st.error(f"Could not load previous run data: {e}")
+
+# --- LOGIC TO RUN NEW PIPELINE ---
+if st.button("Run Pipeline", type="primary", use_container_width=True):
+    if not claim_upload or not hr_upload or not gg_upload:
+        st.warning("⚠️ Please upload all three files before running the pipeline.")
+    else:
+        with st.status("Processing Pipeline...", expanded=True) as status:
+            try:
+                st.write("Processing data records...")
+                zip_data, d_table_1, d_table_2, matches, filtered = process_data(claim_upload, hr_upload, gg_upload)
+                status.update(label="✅ Processing Complete!", state="complete", expanded=False)
+                
+                st.success(f"Pipeline finished! Found **{matches}** matches with GG Data.")
+                st.download_button(label="📥 Download All Output Files (ZIP)", data=zip_data, file_name="Processed_Claims_Outputs.zip", mime="application/zip", type="primary")
+                st.divider()
+                
+                st.markdown("<h3 style='color: #002b5b;'>📊 Dashboard_1_HR_Attendence</h3>", unsafe_allow_html=True)
+                df1 = pd.DataFrame([row for row in d_table_1 if row["HR Status"] != "GRAND TOTAL"])
+                if not df1.empty:
+                    fig1 = px.pie(df1, names='HR Status', values='Count of unique empid', color_discrete_sequence=px.colors.qualitative.Pastel, title='Employee Count Breakdown by HR Status', hole=0.4)
+                    fig1.update_traces(textposition='inside', textinfo='percent+label')
+                    fig1.update_layout(plot_bgcolor="white", paper_bgcolor="white", font=dict(color="#002b5b"), showlegend=False)
+                    st.plotly_chart(fig1, use_container_width=True)
+                st.markdown(generate_html_table(d_table_1), unsafe_allow_html=True)
+                
+                st.markdown("<br><br>", unsafe_allow_html=True)
+                
+                st.markdown("<h3 style='color: #002b5b;'>📊 Dashboard_2_GG_app_HR_Status</h3>", unsafe_allow_html=True)
+                df2 = pd.DataFrame([row for row in d_table_2 if row["GG_app_status"] != "GRAND TOTAL"])
+                if not df2.empty:
+                    fig2 = px.pie(df2, names='GG_app_status', values='Count of unique empid', color_discrete_sequence=px.colors.qualitative.Set2, title='GG App Status Distribution', hole=0.4)
+                    fig2.update_traces(textposition='inside', textinfo='percent+label')
+                    fig2.update_layout(plot_bgcolor="white", paper_bgcolor="white", font=dict(color="#002b5b"))
+                    st.plotly_chart(fig2, use_container_width=True)
+                st.markdown(generate_html_table(d_table_2), unsafe_allow_html=True)
+                
+            except Exception as e:
+                status.update(label="❌ Error during processing", state="error")
+                st.error(f"An error occurred: {str(e)}")
