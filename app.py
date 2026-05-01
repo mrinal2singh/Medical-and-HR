@@ -736,3 +736,69 @@ if st.button("Run Pipeline", type="primary", use_container_width=True):
             except Exception as e:
                 status.update(label="❌ Error during processing", state="error")
                 st.error(f"An error occurred: {str(e)}")
+
+
+
+import os # Add this to the top of your script imports
+
+# ... (All your helper functions and process_data function remain the same) ...
+
+# --- Streamlit UI Components ---
+st.markdown("<p style='text-align: center; color: #002b5b; font-weight: bold;'>FILE UPLOAD SECTION</p>", unsafe_allow_html=True)
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    claim_upload = st.file_uploader("1. Raw Claim File (CSV)", type=['csv', 'txt'])
+with col2:
+    hr_upload = st.file_uploader("2. HR Attendance (CSV)", type=['csv'])
+with col3:
+    gg_upload = st.file_uploader("3. GG App Data (CSV)", type=['csv'])
+
+st.divider()
+
+# --- LOGIC TO SHOW PREVIOUS RUN ---
+# If the user hasn't uploaded files, check if the default GitHub files exist
+if not claim_upload and not hr_upload and not gg_upload:
+    if os.path.exists("Dashboard_1_Summary.csv") and os.path.exists("Dashboard_2_GG_app_HR_Status.csv"):
+        st.info("💡 Showing previous dashboard run. Upload new files above and click 'Run Pipeline' to generate new data.")
+        
+        try:
+            # Read the saved CSVs
+            df_dash1 = pd.read_csv("Dashboard_1_Summary.csv")
+            df_dash2 = pd.read_csv("Dashboard_2_GG_app_HR_Status.csv")
+            
+            # --- DASHBOARD 1 RENDER (From Saved Data) ---
+            st.markdown("<h3 style='color: #002b5b;'>📊 Dashboard_1_HR_Attendence (Last Run)</h3>", unsafe_allow_html=True)
+            
+            df1_plot = df_dash1[df_dash1["HR Status"] != "GRAND TOTAL"]
+            if not df1_plot.empty:
+                fig1 = px.pie(df1_plot, names='HR Status', values='Count of unique empid', hole=0.4, title='Employee Count Breakdown by HR Status')
+                st.plotly_chart(fig1, use_container_width=True)
+
+            # Convert dataframe to list of dicts for your HTML generator
+            html_table_1 = generate_html_table(df_dash1.to_dict('records'))
+            st.markdown(html_table_1, unsafe_allow_html=True)
+            
+            st.markdown("<br><br>", unsafe_allow_html=True)
+            
+            # --- DASHBOARD 2 RENDER (From Saved Data) ---
+            st.markdown("<h3 style='color: #002b5b;'>📊 Dashboard_2_GG_app_HR_Status (Last Run)</h3>", unsafe_allow_html=True)
+            
+            df2_plot = df_dash2[df_dash2["GG_app_status"] != "GRAND TOTAL"]
+            if not df2_plot.empty:
+                fig2 = px.pie(df2_plot, names='GG_app_status', values='Count of unique empid', hole=0.4, title='GG App Status Distribution')
+                st.plotly_chart(fig2, use_container_width=True)
+
+            html_table_2 = generate_html_table(df_dash2.to_dict('records'))
+            st.markdown(html_table_2, unsafe_allow_html=True)
+            
+        except Exception as e:
+            st.error(f"Could not load previous run data: {e}")
+
+# --- LOGIC TO RUN NEW PIPELINE ---
+if st.button("Run Pipeline", type="primary", use_container_width=True):
+    if not claim_upload or not hr_upload or not gg_upload:
+        st.warning("⚠️ Please upload all three files before running the pipeline.")
+    else:
+        with st.status("Processing Pipeline...", expanded=True) as status:
+            # ... (Paste the rest of your existing try/except block here to run process_data and display the charts as usual) ...
