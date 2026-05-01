@@ -1,0 +1,6 @@
+HR Status,Exception Status,Count of unique empid,Number of Hospitised days,Count of Present (days),Count of Absent (days),Count of CasualLeave (days),Count of Privilege leave (days),Count of Weekly off (days),Count of Holiday (days),Count of R (days)
+Absent During the Hospitalization,No,51,206,5,238,0,20,0,0,0
+Attendance Not Available as per HR Record,Data Gap,599,2611,0,0,0,0,0,0,0
+Present for entire tenure of Hospitalization,Yes,15,48,60,0,0,0,3,0,0
+Present for partial tenure during hospitalization,Yes,25,240,27,79,25,3,1,3,0
+GRAND TOTAL,,684,3105,92,317,25,23,4,3,0

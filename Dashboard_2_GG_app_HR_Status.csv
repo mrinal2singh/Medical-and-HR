@@ -1,0 +1,8 @@
+GG_app_status,HR Status,Exception Status,Count of unique empid,Number of Hospitised days,Count of Present (days),Count of Absent (days),Count of CasualLeave (days),Count of Privilege leave (days),Count of Weekly off (days),Count of Holiday (days),Count of R (days)
+Field activity during hospitalisation,Absent During the Hospitalization,Yes,1,6,0,7,0,0,0,0,0
+Field activity during hospitalisation,Attendance Not Available as per HR Record,Data Gap,9,43,0,0,0,0,0,0,0
+No field activity during hospitalization,Absent During the Hospitalization,No,50,200,5,231,0,20,0,0,0
+No field activity during hospitalization,Attendance Not Available as per HR Record,Data Gap,590,2568,0,0,0,0,0,0,0
+No field activity during hospitalization,Present for entire tenure of Hospitalization,Yes,15,48,60,0,0,0,3,0,0
+No field activity during hospitalization,Present for partial tenure during hospitalization,Yes,25,240,27,79,25,3,1,3,0
+GRAND TOTAL,,,684,3105,92,317,25,23,4,3,0
