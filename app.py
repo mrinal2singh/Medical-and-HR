@@ -66,24 +66,26 @@ def apply_custom_styling():
                 color: #002b5b;
             }
             
-            /* Custom Styled Dashboard Table */
+            /* Custom Styled Dashboard Table - MADE SMALLER */
             .dash-table {
                 width: 100%;
                 border-collapse: collapse;
                 margin-top: 1rem;
                 margin-bottom: 2rem;
                 font-family: sans-serif;
+                font-size: 12px; /* Smaller font for the whole table */
                 background-color: white;
             }
             .dash-table th {
                 background-color: #002b5b;
                 color: white;
-                padding: 12px;
+                padding: 8px; /* Reduced padding for compact look */
+                font-size: 13px; /* Slightly larger for headers */
                 text-align: left;
                 border: 1px solid #ddd;
             }
             .dash-table td {
-                padding: 10px;
+                padding: 6px; /* Reduced padding for compact look */
                 border: 1px solid #ddd;
                 color: #333;
             }
