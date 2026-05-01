@@ -326,6 +326,15 @@ def process_data(claim_file, hr_file, gg_file):
         empid = row[0].strip()
         for i, status in enumerate(row[1:]):
             status = status.strip()
+            if status == 'A':  
+                status = 'Absent'
+            elif status == 'PresentrivilegeLeave' or status == 'PrivilegeLeave': 
+                status = 'Privilege leave'
+            elif status == 'WO':
+                status = 'Weekly off'
+            elif status == 'HD':
+                status = 'Holiday'
+                
             if status and i < len(date_headers) and date_headers[i]:
                 dt_str = dt_to_str(date_headers[i])
                 hr_data[(empid, dt_str)] = status
@@ -362,7 +371,7 @@ def process_data(claim_file, hr_file, gg_file):
         
     output_files["final_output.csv"] = f_mapped.getvalue()
 
-    # --- STEP 4 & 5: Summary and Remarks ---
+    # --- STEP 4 & 5: Summary and HR Status ---
     summary_stats = defaultdict(lambda: {
         'original_row': [],
         'empid': "",
@@ -396,26 +405,25 @@ def process_data(claim_file, hr_file, gg_file):
     header_base = extended_raw_header + ["Total_Expanded_Days"] + unique_statuses
     writer_sum.writerow(header_base)
     
-    writer_sg.writerow(header_base + ["Remarks", "Location_Match", "GG_app_status"])
+    writer_sg.writerow(header_base + ["HR Status", "Location_Match", "GG_app_status"])
 
     dashboard_stats_1 = defaultdict(lambda: {
-        'unique_empids': set(), 'hosp_days': 0, 'Present': 0, 'A': 0, 
-        'CasualLeave': 0, 'PresentrivilegeLeave': 0, 'WO': 0, 'HD': 0, 'R': 0
+        'unique_empids': set(), 'hosp_days': 0, 'Present': 0, 'Absent': 0, 
+        'CasualLeave': 0, 'Privilege leave': 0, 'Weekly off': 0, 'Holiday': 0, 'R': 0
     })
     
     dashboard_stats_2 = defaultdict(lambda: {
-        'unique_empids': set(), 'hosp_days': 0, 'Present': 0, 'A': 0, 
-        'CasualLeave': 0, 'PresentrivilegeLeave': 0, 'WO': 0, 'HD': 0, 'R': 0
+        'unique_empids': set(), 'hosp_days': 0, 'Present': 0, 'Absent': 0, 
+        'CasualLeave': 0, 'Privilege leave': 0, 'Weekly off': 0, 'Holiday': 0, 'R': 0
     })
 
     # Keep track of mapping for splitting final_output rows
-    cid_to_remark = {}
+    cid_to_hr_status = {}
 
     for cid, data in summary_stats.items():
         total = data['total']
         
-        # --- NEW LOGIC: Calculate Adjusted Hospitalized Days (Subtract 1) ---
-        # Ensure we don't drop below 0 if a claim somehow only has 1 expanded day
+        # --- Calculate Adjusted Hospitalized Days (Subtract 1) ---
         adjusted_hosp_days = max(0, total - 1)
         
         row_base = data['original_row'] + [adjusted_hosp_days]
@@ -425,56 +433,55 @@ def process_data(claim_file, hr_file, gg_file):
         writer_sum.writerow(row_base)
 
         P = data['statuses'].get('Present', 0)
-        A = data['statuses'].get('A', 0)
-        WO = data['statuses'].get('WO', 0)
+        Absent_count = data['statuses'].get('Absent', 0)
+        WO = data['statuses'].get('Weekly off', 0)
         NF = data['statuses'].get('NOT_FOUND', 0)
-        HD = data['statuses'].get('HD', 0)
+        HD = data['statuses'].get('Holiday', 0)
         R = data['statuses'].get('R', 0)
-        PL = data['statuses'].get('PresentrivilegeLeave', 0)
+        PL = data['statuses'].get('Privilege leave', 0)
         CL = data['statuses'].get('CasualLeave', 0)
         
         other_except_WO = HD + R + PL + CL + NF
         other_except_NF = HD + R + PL + CL + WO
         other_except_PA = HD + R + PL + CL + WO + NF
-        other_except_PL = HD + R + P + CL + WO + NF + A
+        other_except_PL = HD + R + P + CL + WO + NF + Absent_count
         other_except_P = HD + R + PL + CL + NF + WO
 
-        if total == 0: remark = "Attendance Not Available as per HR Record"
-        elif P > 0 and A == 0 and other_except_WO == 0: remark = "Present for entire tenure of Hospitalization"
-        elif P > 0 and other_except_WO > 0: remark = "Present for partial tenure during hospitalization"
-        elif A > 0 and P == 0 and other_except_WO == 0: remark = "Absent During the Hospitalization"
-        elif A > 0 and P > 0 and other_except_PA == 0: remark = "Absent During the Hospitalization"
-        elif A > 0 and other_except_P > 0: remark = "Present for partial tenure during hospitalization"
-        elif PL > 0 and other_except_PL == 0: remark = "Absent During the Hospitalization"
-        elif P == 0 and A == 0 and NF == 0 and WO == 0 and total > 0: remark = "Attendance Not Available as per HR Record"
-        elif NF > 0 and other_except_NF == 0 and total > 0: remark = "Attendance Not Available as per HR Record"
-        else: remark = "Review"
+        if total == 0: hr_status_val = "Attendance Not Available as per HR Record"
+        elif P > 0 and Absent_count == 0 and other_except_WO == 0: hr_status_val = "Present for entire tenure of Hospitalization"
+        elif P > 0 and other_except_WO > 0: hr_status_val = "Present for partial tenure during hospitalization"
+        elif Absent_count > 0 and P == 0 and other_except_WO == 0: hr_status_val = "Absent During the Hospitalization"
+        elif Absent_count > 0 and P > 0 and other_except_PA == 0: hr_status_val = "Absent During the Hospitalization"
+        elif Absent_count > 0 and other_except_P > 0: hr_status_val = "Present for partial tenure during hospitalization"
+        elif PL > 0 and other_except_PL == 0: hr_status_val = "Absent During the Hospitalization"
+        elif P == 0 and Absent_count == 0 and NF == 0 and WO == 0 and total > 0: hr_status_val = "Attendance Not Available as per HR Record"
+        elif NF > 0 and other_except_NF == 0 and total > 0: hr_status_val = "Attendance Not Available as per HR Record"
+        else: hr_status_val = "Review"
 
-        # Store for Splitting logic later
-        cid_to_remark[cid] = remark
+        cid_to_hr_status[cid] = hr_status_val
 
-        # Populate Dashboard 1 Stats (using adjusted_hosp_days)
-        dashboard_stats_1[remark]['unique_empids'].add(data['empid'])
-        dashboard_stats_1[remark]['hosp_days'] += adjusted_hosp_days
-        dashboard_stats_1[remark]['Present'] += P
-        dashboard_stats_1[remark]['A'] += A
-        dashboard_stats_1[remark]['CasualLeave'] += CL
-        dashboard_stats_1[remark]['PresentrivilegeLeave'] += PL
-        dashboard_stats_1[remark]['WO'] += WO
-        dashboard_stats_1[remark]['HD'] += HD
-        dashboard_stats_1[remark]['R'] += R
+        # Populate Dashboard 1 Stats
+        dashboard_stats_1[hr_status_val]['unique_empids'].add(data['empid'])
+        dashboard_stats_1[hr_status_val]['hosp_days'] += adjusted_hosp_days
+        dashboard_stats_1[hr_status_val]['Present'] += P
+        dashboard_stats_1[hr_status_val]['Absent'] += Absent_count
+        dashboard_stats_1[hr_status_val]['CasualLeave'] += CL
+        dashboard_stats_1[hr_status_val]['Privilege leave'] += PL
+        dashboard_stats_1[hr_status_val]['Weekly off'] += WO
+        dashboard_stats_1[hr_status_val]['Holiday'] += HD
+        dashboard_stats_1[hr_status_val]['R'] += R
         
-        # Populate Dashboard 2 Stats (using adjusted_hosp_days)
+        # Populate Dashboard 2 Stats
         gg_app_status = data['gg_app_status']
-        key_2 = (gg_app_status, remark)
+        key_2 = (gg_app_status, hr_status_val)
         dashboard_stats_2[key_2]['unique_empids'].add(data['empid'])
         dashboard_stats_2[key_2]['hosp_days'] += adjusted_hosp_days
         dashboard_stats_2[key_2]['Present'] += P
-        dashboard_stats_2[key_2]['A'] += A
+        dashboard_stats_2[key_2]['Absent'] += Absent_count
         dashboard_stats_2[key_2]['CasualLeave'] += CL
-        dashboard_stats_2[key_2]['PresentrivilegeLeave'] += PL
-        dashboard_stats_2[key_2]['WO'] += WO
-        dashboard_stats_2[key_2]['HD'] += HD
+        dashboard_stats_2[key_2]['Privilege leave'] += PL
+        dashboard_stats_2[key_2]['Weekly off'] += WO
+        dashboard_stats_2[key_2]['Holiday'] += HD
         dashboard_stats_2[key_2]['R'] += R
 
         location_match = False
@@ -484,31 +491,28 @@ def process_data(claim_file, hr_file, gg_file):
             if employee_actual_location and hospital_location:
                 location_match = is_city_match(employee_actual_location, hospital_location)
 
-        writer_sg.writerow(row_base + [remark, location_match, gg_app_status])
+        writer_sg.writerow(row_base + [hr_status_val, location_match, gg_app_status])
 
     output_files["final_summary.csv"] = f_summary.getvalue()
     output_files["final_SG_summary.csv"] = f_final_sg.getvalue()
 
-    # --- STEP 6: Split `final_output` into smaller files based on Dashboards ---
+    # --- STEP 6: Split `final_output` ---
     dash1_splits = defaultdict(list)
     dash2_splits = defaultdict(list)
 
     for c in mapped_data:
         cid = c['cid']
-        remark = cid_to_remark.get(cid, "Review")
+        hr_status_val = cid_to_hr_status.get(cid, "Review")
         gg_status = c['gg_app_status']
         
-        # Split for Dashboard 1 (Remove invalid filename characters)
-        safe_remark = re.sub(r'[\\/*?:"<>|]', "", remark).strip()
+        safe_remark = re.sub(r'[\\/*?:"<>|]', "", hr_status_val).strip()
         dash1_splits[safe_remark].append(c['final_out_row'])
         
-        # Split for Dashboard 2 
         if "No field activity" in gg_status:
             dash2_splits["No_field_activity"].append(c['final_out_row'])
         else:
             dash2_splits["Field_activity_present"].append(c['final_out_row'])
 
-    # Save Dashboard 1 split files into Zip
     for rmk, rows in dash1_splits.items():
         f_out = io.StringIO()
         writer = csv.writer(f_out)
@@ -516,7 +520,6 @@ def process_data(claim_file, hr_file, gg_file):
         writer.writerows(rows)
         output_files[f"Dashboard1_{rmk}.csv"] = f_out.getvalue()
         
-    # Save Dashboard 2 split files into Zip
     for d2_status, rows in dash2_splits.items():
         f_out = io.StringIO()
         writer = csv.writer(f_out)
@@ -524,47 +527,65 @@ def process_data(claim_file, hr_file, gg_file):
         writer.writerows(rows)
         output_files[f"Dashboard2_{d2_status}.csv"] = f_out.getvalue()
 
+    # --- Exception Status Maps ---
+    exception_status_map_1 = {
+        "Absent During the Hospitalization": "No",
+        "Attendance Not Available as per HR Record": "Data Gap",
+        "Present for entire tenure of Hospitalization": "Yes",
+        "Present for partial tenure during hospitalization": "Yes"
+    }
+
+    exception_status_map_2 = {
+        ("Field activity during hospitalisation", "Absent During the Hospitalization"): "Yes",
+        ("Field activity during hospitalisation", "Attendance Not Available as per HR Record"): "Data Gap",
+        ("No field activity during hospitalization", "Absent During the Hospitalization"): "No",
+        ("No field activity during hospitalization", "Attendance Not Available as per HR Record"): "Data Gap",
+        ("No field activity during hospitalization", "Present for entire tenure of Hospitalization"): "Yes",
+        ("No field activity during hospitalization", "Present for partial tenure during hospitalization"): "Yes"
+    }
 
     # --- Formulate Dashboard 1 Table ---
     dashboard_table_1 = []
     all_unique_empids_1 = set()
-    t_hosp_1 = t_p_1 = t_a_1 = t_cl_1 = t_pl_1 = t_wo_1 = t_hd_1 = t_r_1 = 0
+    t_hosp_1 = t_p_1 = t_absent_1 = t_cl_1 = t_pl_1 = t_wo_1 = t_hd_1 = t_r_1 = 0
 
     for rmk, stats in sorted(dashboard_stats_1.items()):
         all_unique_empids_1.update(stats['unique_empids'])
         t_hosp_1 += stats['hosp_days']
         t_p_1 += stats['Present']
-        t_a_1 += stats['A']
+        t_absent_1 += stats['Absent']
         t_cl_1 += stats['CasualLeave']
-        t_pl_1 += stats['PresentrivilegeLeave']
-        t_wo_1 += stats['WO']
-        t_hd_1 += stats['HD']
+        t_pl_1 += stats['Privilege leave']
+        t_wo_1 += stats['Weekly off']
+        t_hd_1 += stats['Holiday']
         t_r_1 += stats['R']
         
         dashboard_table_1.append({
-            "Remarks": rmk,
+            "HR Status": rmk,
+            "Exception Status": exception_status_map_1.get(rmk, ""),
             "Count of unique empid": len(stats['unique_empids']),
             "Number of Hospitised days": stats['hosp_days'],
-            "Count of Present": stats['Present'],
-            "Count of A": stats['A'],
-            "Count of CasualLeave": stats['CasualLeave'],
-            "Count of PresentrivilegeLeave": stats['PresentrivilegeLeave'],
-            "Count of WO": stats['WO'],
-            "Count of HD": stats['HD'],
-            "Count of R": stats['R']
+            "Count of Present (days)": stats['Present'],
+            "Count of Absent (days)": stats['Absent'],
+            "Count of CasualLeave (days)": stats['CasualLeave'],
+            "Count of Privilege leave (days)": stats['Privilege leave'],
+            "Count of Weekly off (days)": stats['Weekly off'],
+            "Count of Holiday (days)": stats['Holiday'],
+            "Count of R (days)": stats['R']
         })
 
     dashboard_table_1.append({
-        "Remarks": "GRAND TOTAL",
+        "HR Status": "GRAND TOTAL",
+        "Exception Status": "", 
         "Count of unique empid": len(all_unique_empids_1),
         "Number of Hospitised days": t_hosp_1,
-        "Count of Present": t_p_1,
-        "Count of A": t_a_1,
-        "Count of CasualLeave": t_cl_1,
-        "Count of PresentrivilegeLeave": t_pl_1,
-        "Count of WO": t_wo_1,
-        "Count of HD": t_hd_1,
-        "Count of R": t_r_1
+        "Count of Present (days)": t_p_1,
+        "Count of Absent (days)": t_absent_1,
+        "Count of CasualLeave (days)": t_cl_1,
+        "Count of Privilege leave (days)": t_pl_1,
+        "Count of Weekly off (days)": t_wo_1,
+        "Count of Holiday (days)": t_hd_1,
+        "Count of R (days)": t_r_1
     })
 
     f_dash1 = io.StringIO()
@@ -577,45 +598,47 @@ def process_data(claim_file, hr_file, gg_file):
     # --- Formulate Dashboard 2 Table ---
     dashboard_table_2 = []
     all_unique_empids_2 = set()
-    t_hosp_2 = t_p_2 = t_a_2 = t_cl_2 = t_pl_2 = t_wo_2 = t_hd_2 = t_r_2 = 0
+    t_hosp_2 = t_p_2 = t_absent_2 = t_cl_2 = t_pl_2 = t_wo_2 = t_hd_2 = t_r_2 = 0
 
     for (gg_status, rmk), stats in sorted(dashboard_stats_2.items()):
         all_unique_empids_2.update(stats['unique_empids'])
         t_hosp_2 += stats['hosp_days']
         t_p_2 += stats['Present']
-        t_a_2 += stats['A']
+        t_absent_2 += stats['Absent']
         t_cl_2 += stats['CasualLeave']
-        t_pl_2 += stats['PresentrivilegeLeave']
-        t_wo_2 += stats['WO']
-        t_hd_2 += stats['HD']
+        t_pl_2 += stats['Privilege leave']
+        t_wo_2 += stats['Weekly off']
+        t_hd_2 += stats['Holiday']
         t_r_2 += stats['R']
         
         dashboard_table_2.append({
             "GG_app_status": gg_status,
-            "Remarks": rmk,
+            "HR Status": rmk,
+            "Exception Status": exception_status_map_2.get((gg_status, rmk), ""),
             "Count of unique empid": len(stats['unique_empids']),
             "Number of Hospitised days": stats['hosp_days'],
-            "Count of Present": stats['Present'],
-            "Count of A": stats['A'],
-            "Count of CasualLeave": stats['CasualLeave'],
-            "Count of PresentrivilegeLeave": stats['PresentrivilegeLeave'],
-            "Count of WO": stats['WO'],
-            "Count of HD": stats['HD'],
-            "Count of R": stats['R']
+            "Count of Present (days)": stats['Present'],
+            "Count of Absent (days)": stats['Absent'],
+            "Count of CasualLeave (days)": stats['CasualLeave'],
+            "Count of Privilege leave (days)": stats['Privilege leave'],
+            "Count of Weekly off (days)": stats['Weekly off'],
+            "Count of Holiday (days)": stats['Holiday'],
+            "Count of R (days)": stats['R']
         })
 
     dashboard_table_2.append({
         "GG_app_status": "GRAND TOTAL",
-        "Remarks": "",
+        "HR Status": "",
+        "Exception Status": "",
         "Count of unique empid": len(all_unique_empids_2),
         "Number of Hospitised days": t_hosp_2,
-        "Count of Present": t_p_2,
-        "Count of A": t_a_2,
-        "Count of CasualLeave": t_cl_2,
-        "Count of PresentrivilegeLeave": t_pl_2,
-        "Count of WO": t_wo_2,
-        "Count of HD": t_hd_2,
-        "Count of R": t_r_2
+        "Count of Present (days)": t_p_2,
+        "Count of Absent (days)": t_absent_2,
+        "Count of CasualLeave (days)": t_cl_2,
+        "Count of Privilege leave (days)": t_pl_2,
+        "Count of Weekly off (days)": t_wo_2,
+        "Count of Holiday (days)": t_hd_2,
+        "Count of R (days)": t_r_2
     })
     
     f_dash2 = io.StringIO()
@@ -671,22 +694,20 @@ if st.button("Run Pipeline", type="primary", use_container_width=True):
                 # --- DASHBOARD 1 RENDER ---
                 st.markdown("<h3 style='color: #002b5b;'>📊 Dashboard_1_HR_Attendence</h3>", unsafe_allow_html=True)
                 
-                # 1. Plotly Pie Chart (Excluding Grand Total)
-                df1 = pd.DataFrame([row for row in d_table_1 if row["Remarks"] != "GRAND TOTAL"])
+                df1 = pd.DataFrame([row for row in d_table_1 if row["HR Status"] != "GRAND TOTAL"])
                 if not df1.empty:
                     fig1 = px.pie(
                         df1, 
-                        names='Remarks', 
+                        names='HR Status', 
                         values='Count of unique empid', 
                         color_discrete_sequence=px.colors.qualitative.Pastel,
-                        title='Employee Count Breakdown by Remark',
+                        title='Employee Count Breakdown by HR Status',
                         hole=0.4
                     )
                     fig1.update_traces(textposition='inside', textinfo='percent+label')
                     fig1.update_layout(plot_bgcolor="white", paper_bgcolor="white", font=dict(color="#002b5b"), showlegend=False)
                     st.plotly_chart(fig1, use_container_width=True)
 
-                # 2. Data Table
                 html_table_1 = generate_html_table(d_table_1)
                 st.markdown(html_table_1, unsafe_allow_html=True)
                 
@@ -695,7 +716,6 @@ if st.button("Run Pipeline", type="primary", use_container_width=True):
                 # --- DASHBOARD 2 RENDER ---
                 st.markdown("<h3 style='color: #002b5b;'>📊 Dashboard_2_GG_app_HR_Status</h3>", unsafe_allow_html=True)
                 
-                # 1. Plotly Pie Chart (Excluding Grand Total)
                 df2 = pd.DataFrame([row for row in d_table_2 if row["GG_app_status"] != "GRAND TOTAL"])
                 if not df2.empty:
                     fig2 = px.pie(
@@ -710,7 +730,6 @@ if st.button("Run Pipeline", type="primary", use_container_width=True):
                     fig2.update_layout(plot_bgcolor="white", paper_bgcolor="white", font=dict(color="#002b5b"))
                     st.plotly_chart(fig2, use_container_width=True)
 
-                # 2. Data Table
                 html_table_2 = generate_html_table(d_table_2)
                 st.markdown(html_table_2, unsafe_allow_html=True)
                 
